@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument("--benchmark", type=str, default="math")
     parser.add_argument("--dataset_id", type=str, required=True)
     parser.add_argument("--dataset_config", type=str, default=None)
-    parser.add_argument("--dataset_split", type=str, default="test")
+    parser.add_argument("--dataset_split", type=str, default="train")
     parser.add_argument("--max_num_samples", type=int, default=None)
     parser.add_argument("--voting_n", type=int, nargs='+', required=True)
     args = parser.parse_args()
@@ -112,4 +112,4 @@ if __name__ == "__main__":
     # Save results
     ds = Dataset.from_dict(data)
     url = ds.push_to_hub(args.dataset_id, config_name=f"{args.dataset_config}--evals")
-    print(f"Results saved to {url}")
+    print(f"Results pushed to {url}")

@@ -16,44 +16,102 @@
 </p>
 
 > [!NOTE]
-> This fork includes tighter integration with the Hugging Face Hub, so that we can evaluate the predictions from models generated with `optillm` and algorithms like MCTS.
+> This fork was used in our [test-time compute scaling blog post](https://huggingface.co/spaces/HuggingFaceH4/blogpost-scaling-test-time-compute) and includes tighter integration with the Hugging Face Hub.
 
-## Evaluate model outputs
+## Installation instructions
 
-To evaluate model outputs first follow the installation examples below and then run:
-
-```shell
-python evaluation/evaluate.py \
-    --benchmark math \
-    --dataset_id reliable-agents/Qwen2.5-Math-1.5B-Instruct-bon-completions \
-    --dataset_config lighteval_MATH--agg_strategy-min--T-1.0--n-256 \
-    --dataset_split train
-```
-
-By default the script computed accuracy on the `pred` column. To compute accuracy on a different column, pass `--dataset_col` as follows:
+To run evaluations, first, create a Python virtual environment using e.g. Conda:
 
 ```shell
-python evaluation/evaluate.py \
-    --benchmark math \
-    --dataset_id reliable-agents/Qwen2.5-Math-1.5B-Instruct-bon-completions \
-    --dataset_config reliable-agents_MATH-500--agg_strategy-last--T-1.0--n-256 \
-    --dataset_split train \
-    --dataset_col pred_weighted@1
+conda create -n qwen-math python=3.11 && conda activate qwen-math
 ```
-
-For Best-of-N, you can evaluate all values of `n` for a given config by running:
 
 ```shell
-python evaluation/evaluate_bon.py \
-    --benchmark math \
-    --dataset_id reliable-agents/Qwen2.5-Math-1.5B-Instruct-bon-completions \
-    --dataset_config reliable-agents_MATH-500--agg_strategy-last--T-1.0--n-256 \
-    --dataset_split train \
-    --voting_n 1 2 4 8 16 32 64 128 256
+pip install -r requirements.txt
 ```
 
+## Evaluate test-time compute outputs
 
-## Original README follows
+To evaluate model outputs stored on a Hub dataset, run:
+
+```shell
+# hub dataset repo
+export DATASET_ID=HuggingFaceH4/Llama-3.2-1B-Instruct-DVTS-completions
+# config to evaluate
+export DATASET_CONFIG=HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-1024--m-4--iters-40--look-0--seed-0--agg_strategy-last
+# preds@N to evaluate
+export VOTING_N="4 16 64 256"
+
+python evaluation/evaluate_hf.py \
+    --dataset_id $DATASET_ID \
+    --dataset_config $DATASET_CONFIG \
+    --voting_n $VOTING_N
+```
+
+For each `n` in `--voting_n`, the script will compute the accuracy for the following columns:
+
+* `pred_naive@{n}`: the prediction with the highest reward score.
+* `pred_weighted@{n}`: the prediction with the largest weighted reward.
+* `pred_maj@{n}`: the prediction determined by majority vote.
+  
+The results will then be pushed to the Hub dataset as a new config called `{DATASET_CONFIG}-evals`. Here is an example config and its eval scores:
+
+* [Config](https://huggingface.co/datasets/HuggingFaceH4/Llama-3.2-1B-Instruct-DVTS-completions/viewer/HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-1024--m-4--iters-40--look-0--seed-0--agg_strategy-last/train)
+* [Evals](https://huggingface.co/datasets/HuggingFaceH4/Llama-3.2-1B-Instruct-DVTS-completions/viewer/HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-1024--m-4--iters-40--look-0--seed-0--agg_strategy-last--evals)
+
+Below are sample commands for each of the algorithm we explored in the blog post:
+
+**Best-of-N**
+
+```shell
+# hub dataset repo
+export DATASET_ID="HuggingFaceH4/Llama-3.2-1B-Instruct-best-of-N-completions"
+# config to evaluate
+export DATASET_CONFIG="HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-1024--max_tokens-2048--bsz-8--seed-0--agg_strategy-last"
+# preds@N to evaluate
+export VOTING_N="1 2 4 16 32 64 128 256"
+
+# Run the evaluation script
+python evaluation/evaluate_hf.py \
+    --dataset_id $DATASET_ID \
+    --dataset_config $DATASET_CONFIG \
+    --voting_n $VOTING_N
+```
+
+**Beam search**
+
+```shell
+# hub dataset repo
+export DATASET_ID="HuggingFaceH4/Llama-3.2-1B-Instruct-beam-search-completions"
+# config to evaluate
+export DATASET_CONFIG="HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-merged--m-4--iters-40--look-0--seed-0--agg_strategy-last"
+# preds@N to evaluate
+export VOTING_N="4 16 64 256"
+
+# Run the evaluation script
+python evaluation/evaluate_hf.py \
+    --dataset_id $DATASET_ID \
+    --dataset_config $DATASET_CONFIG \
+    --voting_n $VOTING_N
+```
+
+**DVTS**
+
+```shell
+# hub dataset repo
+export DATASET_ID=HuggingFaceH4/Llama-3.2-1B-Instruct-DVTS-completions
+# config to evaluate
+export DATASET_CONFIG=HuggingFaceH4_MATH-500--T-0.8--top_p-1.0--n-1024--m-4--iters-40--look-0--seed-0--agg_strategy-last
+# preds@N to evaluate
+export VOTING_N="4 16 64 256"
+
+python evaluation/evaluate_hf.py \
+    --dataset_id $DATASET_ID \
+    --dataset_config $DATASET_CONFIG \
+    --voting_n $VOTING_N
+```
+
+## Original README follows below
 
 Visit our Hugging Face or ModelScope organization (click the links above). Search checkpoints with names starting with `Qwen2.5-Math-`, and you will find all you need! Enjoy!
 
@@ -244,7 +302,7 @@ In contrast, Qwen2.5-Math-72B-Instruct solves 9 problems in Greedy decoding CoT 
 Our evaluation is adapted from [math-evaluation-harness](https://github.com/ZubinGou/math-evaluation-harness).
 Feel free to reproduce the results of all instruction models in the Qwen2.5-Math series with scripts in [evaluation](./evaluation).
 
-### Requirements
+### Installation Requirements
 
 Before the evaluation, please install the required packages with the following command:
 
